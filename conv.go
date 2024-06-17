@@ -10,6 +10,10 @@ func AsString(l *lua.LState, v lua.LValue) lua.LString {
 	return as[lua.LString](l, lua.LTString, v)
 }
 
+func AsNumber(l *lua.LState, v lua.LValue) lua.LNumber {
+	return as[lua.LNumber](l, lua.LTNumber, v)
+}
+
 func as[T lua.LValue](l *lua.LState, t lua.LValueType, v lua.LValue) T {
 	if v, ok := v.(T); ok {
 		return v
