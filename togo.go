@@ -41,6 +41,13 @@ func asFromLuaValuer(v reflect.Value) FromLuaValuer {
 }
 
 func toGo(l *lua.LState, v lua.LValue, target reflect.Value) error {
+	// Check if source and target are of the same type
+	rv := reflect.ValueOf(v)
+	if rv.Type() == target.Type() {
+		target.Set(rv)
+		return nil
+	}
+
 	// Check if target is userdata and target is same type
 	if v, ok := v.(*lua.LUserData); ok {
 		vValue := reflect.ValueOf(v.Value)
@@ -208,15 +215,17 @@ func toGoStruct(l *lua.LState, v lua.LValue, target reflect.Value) error {
 	for i := 0; i < targetType.NumField(); i++ {
 		f := targetType.Field(i)
 
-		tag := luaStructTagOf(f)
-		switch {
-		case tag.NumericKeys:
-			toGoSlice(l, v, target.Field(i), true)
-		case !tag.Ignore:
-			fieldValue := l.GetTable(v, lua.LString(tag.FieldName))
-			if fieldValue != lua.LNil {
-				if err := toGo(l, fieldValue, target.Field(i)); err != nil {
-					return fmt.Errorf("field '%s': %w", tag.FieldName, err)
+		if f.IsExported() {
+			tag := luaStructTagOf(f)
+			switch {
+			case tag.NumericKeys:
+				toGoSlice(l, v, target.Field(i), true)
+			case !tag.Ignore:
+				fieldValue := l.GetTable(v, lua.LString(tag.FieldName))
+				if fieldValue != lua.LNil {
+					if err := toGo(l, fieldValue, target.Field(i)); err != nil {
+						return fmt.Errorf("field '%s': %w", tag.FieldName, err)
+					}
 				}
 			}
 		}
@@ -225,8 +234,8 @@ func toGoStruct(l *lua.LState, v lua.LValue, target reflect.Value) error {
 }
 
 type luaStructTag struct {
-	Ignore      bool
 	FieldName   string
+	Ignore      bool
 	NumericKeys bool
 	Inline      bool
 }

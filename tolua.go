@@ -74,6 +74,11 @@ func toLua(l *lua.LState, v any, rv reflect.Value, t reflect.Type) (lua.LValue, 
 		}
 		return table, nil
 	case reflect.Pointer, reflect.Interface:
+		// Handle nil pointer/interface
+		if rv.IsZero() {
+			return lua.LNil, nil
+		}
+
 		elem := rv.Elem()
 		return toLua(l, elem.Interface(), elem, elem.Type())
 	default:
@@ -83,28 +88,31 @@ func toLua(l *lua.LState, v any, rv reflect.Value, t reflect.Type) (lua.LValue, 
 
 func structToLua(l *lua.LState, target *lua.LTable, rv reflect.Value, t reflect.Type) error {
 	for i := 0; i < rv.NumField(); i++ {
-		tag := luaStructTagOf(t.Field(i))
-		switch {
-		case tag.NumericKeys:
-			if err := numericKeysToLua(l, target, rv.Field(i)); err != nil {
-				return err
-			}
-		case tag.Inline:
-			field := rv.Field(i)
-			if field.Kind() != reflect.Struct {
-				return fmt.Errorf("field %s: inline is only allowed on structs", t.Field(i).Name)
-			}
-			if err := structToLua(l, target, field, t.Field(i).Type); err != nil {
-				return err
-			}
-		case !tag.Ignore:
-			field := rv.Field(i)
+		field := t.Field(i)
+		if field.IsExported() {
+			tag := luaStructTagOf(field)
+			switch {
+			case tag.NumericKeys:
+				if err := numericKeysToLua(l, target, rv.Field(i)); err != nil {
+					return err
+				}
+			case tag.Inline:
+				field := rv.Field(i)
+				if field.Kind() != reflect.Struct {
+					return fmt.Errorf("field %s: inline is only allowed on structs", t.Field(i).Name)
+				}
+				if err := structToLua(l, target, field, t.Field(i).Type); err != nil {
+					return err
+				}
+			case !tag.Ignore:
+				field := rv.Field(i)
 
-			fieldValue, err := toLua(l, field.Interface(), field, field.Type())
-			if err != nil {
-				return fmt.Errorf("field %s: %w", t.Field(i).Name, err)
+				fieldValue, err := toLua(l, field.Interface(), field, field.Type())
+				if err != nil {
+					return fmt.Errorf("field %s: %w", t.Field(i).Name, err)
+				}
+				target.RawSet(lua.LString(tag.FieldName), fieldValue)
 			}
-			target.RawSet(lua.LString(tag.FieldName), fieldValue)
 		}
 	}
 	return nil
