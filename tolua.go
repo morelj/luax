@@ -13,6 +13,9 @@ type LuaValuer interface {
 
 func ToLua(l *lua.LState, v any) lua.LValue {
 	rv := reflect.ValueOf(v)
+	if !rv.IsValid() {
+		return lua.LNil
+	}
 	res, err := toLua(l, v, rv, rv.Type())
 	if err != nil {
 		l.RaiseError(err.Error())
@@ -51,6 +54,10 @@ func toLua(l *lua.LState, v any, rv reflect.Value, t reflect.Type) (lua.LValue, 
 		}
 		return table, nil
 	case reflect.Map:
+		if rv.IsNil() {
+			return lua.LNil, nil
+		}
+
 		table := l.NewTable()
 		iter := rv.MapRange()
 		for iter.Next() {
@@ -67,7 +74,12 @@ func toLua(l *lua.LState, v any, rv reflect.Value, t reflect.Type) (lua.LValue, 
 			table.RawSet(luaKey, luaValue)
 		}
 		return table, nil
-	case reflect.Slice, reflect.Array:
+	case reflect.Slice:
+		if rv.IsNil() {
+			return lua.LNil, nil
+		}
+		fallthrough
+	case reflect.Array:
 		table := l.NewTable()
 		if err := numericKeysToLua(l, table, rv); err != nil {
 			return lua.LNil, err
