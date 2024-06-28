@@ -56,11 +56,13 @@ func indexStruct(l *lua.LState) int {
 	}
 	vType := v.Type()
 	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		tag := luaStructTagOf(vType.Field(i))
-		if tag.FieldName != "" && index == tag.FieldName {
-			l.Push(ToLua(l, field.Interface()))
-			return 1
+		if vType.Field(i).IsExported() {
+			field := v.Field(i)
+			tag := luaStructTagOf(vType.Field(i))
+			if tag.FieldName != "" && index == tag.FieldName {
+				l.Push(ToLua(l, field.Interface()))
+				return 1
+			}
 		}
 	}
 
@@ -85,11 +87,13 @@ func newIndexStruct(l *lua.LState) int {
 	}
 	vType := v.Type()
 	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		tag := luaStructTagOf(vType.Field(i))
-		if tag.FieldName != "" && index == tag.FieldName {
-			if err := toGo(l, value, field); err != nil {
-				l.RaiseError(err.Error())
+		if vType.Field(i).IsExported() {
+			field := v.Field(i)
+			tag := luaStructTagOf(vType.Field(i))
+			if tag.FieldName != "" && index == tag.FieldName {
+				if err := toGo(l, value, field); err != nil {
+					l.RaiseError(err.Error())
+				}
 			}
 		}
 	}
